@@ -1,0 +1,42 @@
+name: Build AI Robotic Controller APK
+on:
+  push:
+    branches: [main]
+    paths: [android_bundle.b64, .github/workflows/build.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore Android project
+        run: base64 -d android_bundle.b64 > /tmp/android-src.zip && unzip -oq /tmp/android-src.zip -d .
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - name: Install Android platform
+        run: sdkmanager --install "platforms;android-35" "build-tools;35.0.0" "platform-tools"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Compile APK
+        working-directory: android
+        run: gradle --no-daemon --stacktrace :app:assembleDebug
+      - name: Verify APK
+        run: |
+          test -s android/app/build/outputs/apk/debug/app-debug.apk
+          unzip -t android/app/build/outputs/apk/debug/app-debug.apk | tail -1
+          mkdir -p dist
+          cp android/app/build/outputs/apk/debug/app-debug.apk dist/AI_Robotic_Controller.apk
+          sha256sum dist/AI_Robotic_Controller.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AI-Robotic-Controller-APK
+          path: dist/AI_Robotic_Controller.apk
+          if-no-files-found: error
+          retention-days: 30
